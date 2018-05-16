@@ -1,17 +1,22 @@
 
 using JuMP
-using Cbc
-using JuMP
 using PyPlot
 using Optim
 using GLPKMathProgInterface
 
 debug = true
+epsilon = 1e-9
+max_iter = 1000
 
 function printdbe(str::String)
     if (debug == true)
         println(str)
     end
+end
+
+function printlog(str::String)
+    println(str)
+    #TODO log file
 end
 
 function def_prob1()
@@ -29,70 +34,68 @@ function def_prob2()
     return c, A, b
 end
 
-c, A, b = def_prob1()
+function simplexFaseI(c,A,b)
+    num_folgas = size(c)[1]
+    c = [c;zeros(num_folgas,1)]
+    A = hcat(A, eye(num_folgas))
 
-num_folgas = size(c)[1]
-c = [c;zeros(num_folgas,1)]
-A = hcat(A, eye(num_folgas))
+    x = [0 ; 0]
+    n = size(A)[:2]
+    m = length(b)
+    n_m = n-m
 
-x = [0 ; 0]
-n = size(A)[:2]
-m = length(b)
-#n_m = (length(c)-length(b))
-n_m = n-m
+    ind_base = [(m+1):n...]
+    ind_nobase = [1:m...]
 
-#z = [0]
-#z = [z; c[1:n_m]]
+    for i=1:max_iter
 
-ind_base = [(m+1):n...]
-printdbe("ind_base: $(ind_base)")
-ind_nobase = [1:m...]
-printdbe("ind_nobase: $(ind_nobase)")
-#println("z: ", z)
+        printlog("\niteração: $(i)")
+        printlog("base: $(ind_base)")
+        printlog("no base: $(ind_nobase)")
 
-println("\n\n\n")
-custo_reduzido_nao_otimo = false
-while(!custo_reduzido_nao_otimo)
-    B = A[:, ind_base]
-    printdbe("B: $(B)")
-    N = A[:, ind_nobase]
-    printdbe("N: $(N)")
-    cB = c[ind_base]
-    printdbe("cB: $(cB)")
-    cN = c[ind_nobase]
-    printdbe("cN: $(cN)")
+        B = A[:, ind_base]
+        printdbe("B: $(B)")
+        N = A[:, ind_nobase]
+        printdbe("N: $(N)")
+        cB = c[ind_base]
+        printdbe("cB: $(cB)")
+        cN = c[ind_nobase]
+        printdbe("cN: $(cN)")
 
-    xB = B\b
-    println("xB: ", xB)
-    dB = -B\N
-    println("dB: ", dB)
+        xB = B\b
+        printdbe("xB: $(xB)")
+        dB = -B\N
+        printdbe("dB: $(dB)")
 
-    z = cB'*xB
-    println("z: ", z)
-    y = B'\cB
-    println("y: ", y)
-    cr = (cN' - y'*N)'
-    println("custo reduzido (cr): ", cr)
-    #se não há cr(i) não negativo
-    if (length(find(cred.>=0)) == 0)
-        custo_reduzido_nao_otimo = true
-    else
-        ind_maior_crj = indmax(cr)
-        printdb("ind_maior_crj: ", ind_maior_crj)
-        r = xB./dB[:,j]
-        println("r: ", r)
-        ind = find(r.>=0)
-        r[ind] = NaN
-        println("r: ", r)
-        i = indmin(abs.(r))
+        z = cB'*xB
+        printlog("z: $(z)")
+        y = B'\cB
+        printdbe("y: $(y)")
+        cr = (cN' - y'*N)'
+        printdbe("custo reduzido (cr): $(cr)")
+        #se não há cr(i) não negativo
+        if (length(find(cr.>= epsilon)) == 0)
+            return true
+        else
+            ind_maior_crj = indmax(cr)
+            printdbe("ind_maior_crj: $(ind_maior_crj)")
+            r = xB./dB[:,ind_maior_crj]
+            printdbe("r: $(r)")
+            ind = find(r.>=0)
+            r[ind] = NaN
+            printdbe("r: $(r)")
+            i = indmin(abs.(r))
 
-        aux = ind_base[i]
-        println("aux: ", aux)
-        ind_nobase[j]
-        ind_base[i] =ind_nobase[j]
-        println("ind_base[j]: ", ind_base[j])
-        ind_nobase[j] = aux
-        println("ind_nobase[j]: ", ind_nobase[j])
+            aux = ind_base[i]
+            printdbe("aux: $(aux)")
+            ind_base[i] = ind_nobase[ind_maior_crj]
+            printdbe("ind_base[ind_maior_crj]: $(ind_base[ind_maior_crj])")
+            ind_nobase[ind_maior_crj] = aux
+            printdbe("ind_nobase[ind_maior_crj]: $(ind_nobase[ind_maior_crj])")
+        end
     end
-    println("\n");
+    return false
 end
+
+c, A, b = def_prob1()
+ret = simplexFaseI(c, A, b)

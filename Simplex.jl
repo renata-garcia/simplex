@@ -1,4 +1,3 @@
-
 using JuMP
 using PyPlot
 using Optim
@@ -7,6 +6,7 @@ using GLPKMathProgInterface
 debug = true
 epsilon = 1e-9
 max_iter = 1000
+fname = "simplex.log"
 
 function printdbe(str::String)
     if (debug == true)
@@ -14,9 +14,22 @@ function printdbe(str::String)
     end
 end
 
-function printlog(str::String)
+function printlog(filestream, str::String)
     println(str)
-    #TODO log file
+    logWriteFile(filestream, str)
+end
+
+function logCreateFile()
+    filestream = open(fname, "w")
+    return filestream
+end
+
+function logWriteFile(filestream, str)
+    pwrite(filestream, str)
+end
+
+function logCloseFile(filestream)
+    close(filestream)
 end
 
 function def_prob1()
@@ -35,6 +48,7 @@ function def_prob2()
 end
 
 function simplexFaseI(c,A,b)
+    f = logCreateFile()
     num_folgas = size(c)[1]
     c = [c;zeros(num_folgas,1)]
     A = hcat(A, eye(num_folgas))
@@ -49,9 +63,9 @@ function simplexFaseI(c,A,b)
 
     for i=1:max_iter
 
-        printlog("\niteração: $(i)")
-        printlog("base: $(ind_base)")
-        printlog("no base: $(ind_nobase)")
+        printlog(f,"\niteração: $(i)")
+        printlog(f,"base: $(ind_base)")
+        printlog(f,"no base: $(ind_nobase)")
 
         B = A[:, ind_base]
         printdbe("B: $(B)")
@@ -68,7 +82,7 @@ function simplexFaseI(c,A,b)
         printdbe("dB: $(dB)")
 
         z = cB'*xB
-        printlog("z: $(z)")
+        printlog(f,"z: $(z)")
         y = B'\cB
         printdbe("y: $(y)")
         cr = (cN' - y'*N)'
@@ -94,6 +108,8 @@ function simplexFaseI(c,A,b)
             printdbe("ind_nobase[ind_maior_crj]: $(ind_nobase[ind_maior_crj])")
         end
     end
+    logCloseFile()
+
     return false
 end
 

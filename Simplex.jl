@@ -7,14 +7,14 @@ using Optim
 ###Renata Garcia Oliveira - Pós - 1712535###########
 ###renata.garcia.eng@gmail.com######################
 
-debug = false
+debug = true
 epsilon = 1e-9
 max_iter = 1000
 filestream = open("simplex.log", "w")
 
 function printdbe(str::String)
     if (debug == true)
-        printdbe(str)
+        println(str)
     end
 end
 

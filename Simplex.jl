@@ -25,7 +25,7 @@ function logCreateFile()
 end
 
 function logWriteFile(filestream, str)
-    pwrite(filestream, str)
+    write(filestream, str)
 end
 
 function logCloseFile(filestream)
@@ -47,7 +47,14 @@ function def_prob2()
     return c, A, b
 end
 
-function simplexFaseI(c,A,b)
+function simplexFaseII(c, A, b)
+
+
+
+    simplexFaseI(f, c,A,b)
+end
+
+function simplexFaseI(c, A, b)
     f = logCreateFile()
     num_folgas = size(c)[1]
     c = [c;zeros(num_folgas,1)]
@@ -113,5 +120,5 @@ function simplexFaseI(c,A,b)
     return false
 end
 
-c, A, b = def_prob1()
-ret = simplexFaseI(c, A, b)
+c, A, b = def_prob2()
+simplexFaseI(c, A, b)

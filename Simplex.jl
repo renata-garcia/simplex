@@ -7,7 +7,7 @@ using Optim
 ###Renata Garcia Oliveira - Pós - 1712535###########
 ###renata.garcia.eng@gmail.com######################
 
-debug = true
+debug = false
 epsilon = 1e-9
 max_iter = 1000
 filestream = open("simplex.log", "w")
@@ -78,86 +78,114 @@ function simplex(c, A, b)
         printdbe("A: $(A)")
         printdbe("c: $(c)")
         printdbe("b: $(b)")
-        ind_base,ind_nobase,status = simplexFaseI(c, A, b, ind_base, ind_nobase)
-	if status == -2
+        A1, b, c1, status = simplexFaseI(c, A, b)
+	if status == 1
+            printlog("\nSimplex Fase II")
+
+	    num_folgas = size(b)[1]
+	    c1 = [c;zeros(num_folgas,1)]
+	    A1 = hcat(A, eye(num_folgas))
+
+	    x = [0 ; 0]
+	    n = size(A)[:2]
+	    m = length(b)
+	    n_m = n-m
+
+	    ind_base = [(m+1):(n+1)...]
+	    ind_nobase = [1:m...]
+	    printdbe("ind_base: $(ind_base)")
+	    printdbe("ind_nobase: $(ind_nobase)")
+            #A = A[:,vcat(ind_base,ind_nobase)]
+            #c = c[vcat(ind_base,ind_nobase)]
+	    #printdbe("base: $(ind_base)")
+	    #printdbe("nobase: $(ind_nobase)")
+	    x,z,status = simplexFaseII(c1,A1,b,ind_base,ind_nobase)
+	else
             printdbe("Problema Inviável")
             return -2
-        else
-            printlog("\nSimplex Fase II")
-            A = A[:,vcat(ind_base,ind_nobase)]
-            c = c[vcat(ind_base,ind_nobase)]
-	    printdbe("base: $(ind_base)")
-	    printdbe("nobase: $(ind_nobase)")
-	    x,z,status = simplexFaseII(c,A,b,ind_base,ind_nobase)
         end
     end    
 end
 
-function simplexFaseI(c, A, b, ind_base, ind_nobase)
+function simplexFaseI(c, A, b)
+    m, n = size(A)
+    nv = n - m
+    
+    Aw = -1 * ones(m, n + 1)
+    Aw[:,1:n] = A
+    bw = b
+    cw = zeros(n+1)
+    cw[n+1] = 1
+    
+    x = zeros(n+1)
+    bidx = [i for i in (nv+1):(n)]
+    nidx = [i for i in 1:(n+1) if !(i in bidx)]
+    
+    status = 3 
+    it = 0
+    while status > 1
+        it += 1
 
-    A = hcat(A,-1*ones(1,size(A)[1])')   
-    c = vcat(zeros(length(c)),-1)
+        B = Aw[:, bidx]
+        N = Aw[:, nidx]
+        
+        xn = zeros(length(nidx))
+        d = B \ b
+        db = B \ N
 
-    m = size(A)[1] + 1
-    n = size(A)[2] - m
+        xb = d - db * xn
+        x[bidx] = xb
+        x[nidx] = xn
 
-    ind_nobase = vcat([i for i in 1:n],size(A)[2])
-    ind_base  = [i for i in (n+1):(n+m-1)]
+        cn = cw[nidx]
+        cb = cw[bidx]
 
-    B = A[:,ind_base]   
-    N = A[:,ind_nobase] 
-    xB = B \ b     
+        cr = cn' - cb' * db
+        z = cb' * xb + (cr) * xn
 
-    j          = length(ind_nobase) 
-    k          = indmin(xB)    
-    r_ind_base  = ind_base[k]        
-    r_ind_nobase = ind_nobase[j]      
-    ind_base[k]      = r_ind_nobase   
-    ind_nobase[j]      = r_ind_base  
+        if it == 1
+            nvbidx = length(nidx)
+        else
+            nvbidx = indmin(cr)
+        end
 
-    printlog("B: $(B)")
-    printlog("xB: $(xB)")
-
-    for i = 1:max_iter
-
-        printdbe("Iteracao #$(i)")
-
-        B = A[:,ind_base]
-        N = A[:,ind_nobase]
-        xB = B \ b       
-        dB = -B \ N
-        cB = c[ind_base] 
-        cN = c[ind_nobase]
-        cR = (cN' + cB'*dB)'
-        j  = indmax(cR)     
-
-        x      = zeros(n+m)
-        x[ind_base]  = xB
-
-        printdbe("x     = $(x)")
-        printdbe("ind_base  = $(ind_base)")
-        printdbe("ind_nobase = $(ind_nobase)")
-        printdbe("")
-
-        if all(cR .<= epsilon)
-            ind_base
-            ind_nobase = ind_nobase[ind_nobase .!= size(A)[2]]
+        nvnidx = indmin(xb ./ abs.(db[:,nvbidx]))
+        
+        if minimum(cr) >= 0 && it > 1
             status = 1
-            return (ind_base, ind_nobase, status)
+
+            x = zeros(n+1)
+            x[bidx] = xb
+
+            printdbe("it: $(it)")
+	    printdbe("x: $(x)")
+	    printdbe("bidx: $(bidx)")
+	    printdbe("nidx: $(nidx)")
+	    printdbe("z: $(z)")
+	    printdbe("status: $(status)")
+            break
         end
+       
+        old_bidx = deepcopy(bidx)
+        bidx[nvnidx] = nidx[nvbidx] 
+        nidx[nvbidx] = old_bidx[nvnidx]
+    end
 
-        if all(dB[:,j] .>= epsilon)
-            status = -2
-            return (status);
-        end
+    orig_bidx = [i for i in bidx if i!=(n+1)]
+    orig_nidx = [i for i in nidx if i!=(n+1)]
 
-        r  = xB./(dB[:,j])
-        k  = indmax(r[r .< 0])
+    A1 = zeros(size(A))
+    A1[:, 1:length(orig_nidx)] = A[:,orig_nidx] 
+    A1[:, (length(orig_nidx)+1):n] = A[:, orig_bidx] 
+    c1 = zeros(n)
+    c1[1:length(orig_nidx)] = c[orig_nidx]
+    c1[(length(orig_nidx)+1):end] = c[orig_bidx]
 
-        auxB  = ind_base[k]
-        ind_base[k] = ind_nobase[j]
-        ind_nobase[j] = auxB
-    end	
+    printdbe("A1: $(A1)")
+    printdbe("b: $(b)")
+    printdbe("c1: $(c1)")
+
+    return A1, b, c1, status
 end
 
 function simplexFaseII(c, A, b, ind_base, ind_nobase)
